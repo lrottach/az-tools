@@ -29,8 +29,35 @@ $InformationPreference = "Continue"
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
-# Example
-# Use this area for writing functions
+# Function to write customized outputs to console
+function Write-Log {
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$Message,
+ 
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [ValidateSet('Information', 'Warning', 'Error', 'Success')]
+    [string]$Severity = 'Information'
+  )
+  
+  switch ($Severity) {
+    'Information' { 
+      Write-Host "[INFORMATION] $Message" -ForegroundColor Blue
+    }
+    'Warning' {
+      Write-Host "[WARNING] $Message" -ForegroundColor Yellow
+    }
+    'Error' {
+      Write-Host "[ERROR] $Message" -ForegroundColor Red
+    }
+    'Success' {
+      Write-Host "[SUCCESS] $Message" -ForegroundColor Green
+    }
+  }
+}
 
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
