@@ -11,6 +11,8 @@
   Version:        <1.0>
   Author:         <Lukas Rottach>
   Creation Date:  <23rd June 2022>
+  License:        <MIT>
+  Location:       <https://github.com/lrottach/az-tools>
 .EXAMPLE
   <Example goes here. Repeat this attribute for more than one example>
 #>
@@ -42,6 +44,7 @@ Write-Host "
                                                                                                       
 " -ForegroundColor DarkBlue
 Write-Host "--------------------------------------------------------------"
+Write-Host "Title:        Azure Managed Image Publisher"
 Write-Host "Author:       Lukas Rottach"
 Write-Host "Description:  Create and publish Azure Managed Images to an Azure Compute Gallery"
 Write-Host "--------------------------------------------------------------"
