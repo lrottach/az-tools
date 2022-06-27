@@ -10,22 +10,41 @@
 .NOTES
   Version:        <1.0>
   Author:         <Lukas Rottach>
-  Creation Date:  <23rd June 2022>
+  Creation Date:  <23/06/2022>
   License:        <MIT>
-  Location:       <https://github.com/lrottach/az-tools>
+  Site:           <https://github.com/lrottach/az-tools>
 .EXAMPLE
   <Example goes here. Repeat this attribute for more than one example>
 #>
 
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------
 
+[CmdletBinding()]
+param (
+  [Parameter()]
+  [string]$SourceVm,
+
+  [Parameter()]
+  [string]$ImageDefinition,
+
+  [Parameter()]
+  [string]$ImageVersion
+)
+
 $VerbosePreference = "Continue"
 $InformationPreference = "Continue"
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
-# Example
-# Declare Variables in this area
+# Deployment variables
+$tenantId = ""
+$subscriptionId = ""
+$deploymentLocation = ""
+
+# Target resources
+$targetComputeGallery = ""
+$temporaryRg = ""
+
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
