@@ -31,8 +31,7 @@ param (
   [string]$ImageVersion
 )
 
-$VerbosePreference = "Continue"
-$InformationPreference = "Continue"
+$ErrorActionPreference = "SilentlyContinue"
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
