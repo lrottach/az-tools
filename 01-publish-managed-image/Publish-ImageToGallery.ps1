@@ -190,6 +190,43 @@ function New-AzTemporaryVm {
     exit
   }
 
+function New-AzManagedImage {
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ImageName,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ImageVm,
+ 
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$WorkingRgName,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ImageNamePrefix 
+  )
+
+  Write-Log -Message "Starting image creation process" -Severity Information
+  Write-Log -Message "Checking status for working virtual machine '$($ImageVm)'" -Severity Information
+
+  $sysprepStatus = (Get-AzVM -Name $ImageVm -ResourceGroupName $WorkingRgName -Status).Statuses[1].DisplayStatus
+
+  if (!($sysprepStatus.Contains("deallocated"))) {
+    Write-Log -Message "VM was not properly deallocated. Start deallocating it" -Severity Information
+    try {
+      Stop-AzVM -Name $ImageVm -ResourceGroupName $WorkingRgName -Force
+      Write-Log -Message "Deallocated virtual machine" -Severity Success
+    }
+    catch {
+      Write-Log -Message "Failed to deallocate virtual machine" -Severity Error
+      exit
+    }
+  }
+
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 Write-Host "
