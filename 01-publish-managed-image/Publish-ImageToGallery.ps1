@@ -261,6 +261,7 @@ function New-AzManagedImage {
   Start-Sleep -Seconds 10
 }
 
+function Add-ImageToAzGallery {
   [CmdletBinding()]
   param(
     [Parameter()]
