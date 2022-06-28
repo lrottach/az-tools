@@ -319,8 +319,9 @@ Write-Host "
      \/   |_____|_|  \_\ |_|   \____/_/    \_\______| |_____/|______|_____/|_|\_\  |_|  \____/|_|     
                                                                                                       
 " -ForegroundColor DarkBlue
-Write-Host "--------------------------------------------------------------"
-Write-Host "Title:        Azure Managed Image Publisher"
-Write-Host "Author:       Lukas Rottach"
-Write-Host "Description:  Create and publish Azure Managed Images to an Azure Compute Gallery"
-Write-Host "--------------------------------------------------------------"
+Write-Host "------------------------------------------------------------------------------------" -ForegroundColor DarkBlue
+Write-Host "Title:        Azure Managed Image Publisher" -ForegroundColor DarkBlue
+Write-Host "Author:       Lukas Rottach" -ForegroundColor DarkBlue
+Write-Host "Description:  Create and publish Azure Managed Images to an Azure Compute Gallery" -ForegroundColor DarkBlue
+Write-Host "------------------------------------------------------------------------------------" -ForegroundColor DarkBlue
+
