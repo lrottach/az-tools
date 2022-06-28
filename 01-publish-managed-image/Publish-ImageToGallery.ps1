@@ -190,6 +190,10 @@ function New-AzTemporaryVm {
     exit
   }
 
+  Start-Sleep -Seconds 5
+  return $vmName
+}
+
 function New-AzManagedImage {
   [CmdletBinding()]
   param(
