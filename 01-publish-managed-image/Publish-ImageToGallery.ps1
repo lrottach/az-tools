@@ -104,6 +104,92 @@ function Compare-AzContext {
   
 }
 
+function New-AzTemporaryVm {
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$SourceVm,
+ 
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$TargetRgName
+  )
+
+  # Dependency Check
+  Write-Log -Message "Checking required depencencies for temporary VM deployment" -Severity Information
+
+  $vm = Get-AzVM -Name $SourceVm
+
+  if ($null -eq $vm) {
+    Write-Log -Message "The requested source VM does not exist. Restart the script and provide a valid virtual machine" -Severity Error
+    exit
+  }
+
+  Write-Log -Message "Building new resource names" -Severity Information
+
+  $vmName = $SourceVm + "temp"
+  $snapshotName = $vmName + "-snapshot"
+  $diskName = $vmName + "-disk"
+  $nicName = $vmName + "-nic"
+  
+  if ($null -ne (Get-AzVM -Name $vmName)) {
+    Write-Log -Message "Virtual machine with the name $($vmName) already exists in resource group $($TargetRgName)" -Severity Error
+    Write-Log -Message "Cleanup old temporary resources and run the script again" -Severity Error
+    exit
+  }
+
+  # Create snapshot from existing Golden VM
+  Write-Log -Message "Preparing snapshot configuration" -Severity Information
+  $snapshotConfig = New-AzSnapshotConfig -SourceUri $vm.StorageProfile.OsDisk.ManagedDisk.Id `
+    -Location $vm.Location `
+    -CreateOption Copy
+    
+  Write-Log -Message "Creating snapshot $($snapshotName)" -Severity Information
+  $snapshot = New-AzSnapshot -Name $snapshotName -ResourceGroupName $TargetRgName -Snapshot $snapshotConfig
+
+  $snapshot = Get-AzSnapshot -ResourceGroupName $TargetRgName -Name $snapshotName
+
+  # Create managed disk from snapshot
+  Write-Log -Message "Creating new managed disk $($diskName)" -Severity Information
+  $diskconfig = New-AzDiskConfig -Location $deploymentLocation `
+    -SourceResourceId $snapshot.Id `
+    -CreateOption Copy
+    
+  $disk = New-AzDisk -Disk $diskconfig -ResourceGroupName $TargetRgName -DiskName $diskName
+
+  Write-Log -Message "Starting VM configuration with size 'Standard_D2as_v4'" -Severity Information
+  $vmConfig = New-AzVMConfig -VMName $vmName -VMSize "Standard_D2as_v4"
+  $vmConfig = Set-AzVMOSDisk -VM $vmConfig `
+    -ManagedDiskId $disk.Id `
+    -CreateOption Attach `
+    -Windows
+  
+  Write-Log -Message "Gathering resource information for target subnet $($targetSubnet) in virtual network $($targetVnetName)" -Severity Information
+  $vnet = Get-AzVirtualNetwork -Name $targetVnetName -ResourceGroupName $targetVnetRgName
+  $subnet = Get-AzVirtualNetworkSubnetConfig -Name $targetSubnet -VirtualNetwork $vnet
+
+  Write-Log -Message "Started creation of network interface $($nicName)" -Severity Information
+
+  $vmNic = New-AzNetworkInterface -Name $nicName `
+    -ResourceGroupName $TargetRgName `
+    -Location $deploymentLocation `
+    -SubnetId $subnet.Id `
+    -ErrorAction Continue
+
+  $vmConfig = Add-AzVMNetworkInterface -VM $vmConfig -Id $vmnic.Id
+  $vmConfig = Set-AzVMBootDiagnostic -VM $vmConfig -Disable
+
+  Write-Log -Message "Starting deployment of virtual machine $($vmName)" -Severity Information
+  try {
+    $vmInformation = New-AzVm -VM $vmConfig -ResourceGroupName $TargetRgName -Location $deploymentLocation -DisableBginfoExtension
+    Write-Log -Message "Successfully created virtual machine" -Severity Success
+  }
+  catch {
+    Write-Log -Message "Failed to deploy virtual machine $($vmName)" -Severity Error
+    exit
+  }
+
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 Write-Host "
