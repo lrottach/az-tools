@@ -325,3 +325,85 @@ Write-Host "Author:       Lukas Rottach" -ForegroundColor DarkBlue
 Write-Host "Description:  Create and publish Azure Managed Images to an Azure Compute Gallery" -ForegroundColor DarkBlue
 Write-Host "------------------------------------------------------------------------------------" -ForegroundColor DarkBlue
 
+# Connection
+Write-Log -Message "Checking if account is already authenticated for the configured tenant and subscription" -Severity Information
+$isAuthenticated = Compare-AzContext -TenantId $tenantId -SubscriptionId $subscriptionId
+
+if ($isAuthenticated) {
+  Write-Log -Message "Already authenticated to Azure Tenant $($tenantId)" -Severity Success
+}
+else {
+  Write-Log -Message "Follow the instructions to connect to your Azure tenant" -Severity Information
+  try {
+    $connectionDetails = Connect-AzAccount -UseDeviceAuthentication -Tenant $tenantId -Subscription $subscriptionId
+    Write-Log -Message "Authentication successful. Welcome user $($connectionDetails.Context.Account.Id)" -Severity Success
+  }
+  catch {
+    Write-Log -Message "Authentication failed" -Severity Error
+    exit
+  }
+}
+
+# Preparing
+Write-Log -Message "Checking for temporary resource group $($temporaryRgName)" -Severity Information
+$temporaryRg = Get-AzResourceGroup -Name $temporaryRgName -Location $deploymentLocation -ErrorAction SilentlyContinue
+if ($temporaryRg) {
+  Write-Log -Message "Temporary resource group already exists. Continue execution" -Severity Information
+}
+else {
+  Write-Log -Message "Temporary resource group does not exist. Continue creation" -Severity Information
+  try {
+    $temporaryRg = New-AzResourceGroup -Name $temporaryRgName -Location $deploymentLocation -ErrorAction SilentlyContinue
+    Write-Log "Successfully created temporary resource group $($temporaryRg.ResourceGroupName)" -Severity Success
+  }
+  catch {
+    Write-Log "Failed to create temporary resource group $($temporaryRgName)" -Severity Error
+    exit
+  }
+}
+
+# Temp Vm Deployment
+$tempVmName = New-AzTemporaryVm -SourceVm $SourceVm -TargetRgName $temporaryRgName
+
+# Get ip configuration
+$tempVm = Get-AzVM -Name $tempVmName
+$tempVmNic = $tempVm.NetworkProfile.NetworkInterfaces[0].Id.Split("/") | Select-Object -Last 1
+$ipConfig = (Get-AzNetworkInterface -Name $tempVmNic).IpConfigurations.PrivateIpAddress
+
+# Waiting until sysprep was performed by user and vm is turned off
+Write-Log -Message "Waiting until sysprep is completed" -Severity Information
+Write-Log -Message "Connect to VM $($tempVm.Name) on address $($ipConfig) and shutdown after completed" -Severity Information
+Write-Log -Message "Waiting until VM was turned off" -Severity Information
+$sysprepCompleted = $false
+
+do {
+  $vmStatus = (Get-AzVM -Name $tempVmName -ResourceGroupName $temporaryRgName -Status).Statuses[1].DisplayStatus
+  if ($vmStatus.Contains("deallocated") -or $vmStatus.Contains("stopped")) {
+    $sysprepCompleted = $true
+    Write-Log -Message "Detected that VM is stopped. Continue execution" -Severity Information
+  }
+  Start-Sleep -Seconds 10
+} while (!($sysprepCompleted))
+
+# Image creation
+New-AzManagedImage -ImageName $imageName -ImageVm $tempVmName -WorkingRgName $temporaryRgName -ImageNamePrefix "win10-21H2-x64-en-gen2"
+
+# Publish to compute gallery
+Add-ImageToAzGallery -ManagedImageName $imageName `
+  -WorkingRgName $temporaryRgName `
+  -ImageDefinition $ImageDefinition `
+  -ImageVersion $ImageVersion `
+  -ComputeGallery $targetComputeGallery `
+  -ComputeGalleryRg $targetComputeGalleryRg
+
+Write-Log -Message "Starting cleanup tasks for temporary resources" -Severity Information
+try {
+  Remove-AzResourceGroup -Name $temporaryRgName -Force
+  Write-Log -Message "Finished removal of all temporary resources" -Severity Success
+}
+catch {
+  Write-Log -Message "Failed to remove temporary resources" -Severity Error
+  exit
+}
+
+Write-Log -Message "End of script" -Severity Information
