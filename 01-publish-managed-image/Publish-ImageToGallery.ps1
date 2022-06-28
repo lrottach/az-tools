@@ -227,6 +227,36 @@ function New-AzManagedImage {
     }
   }
 
+  # Set vm status to generalized
+  Write-Log -Message "Trying to set vm status to 'generalized'" -Severity Information
+  try {
+    $vmStatus = Set-AzVM -ResourceGroupName $WorkingRgName -Name $ImageVm -Generalized
+    Write-Log -Message "Successfully set vm status to 'generalized'" -Severity Success
+  }
+  catch {
+    Write-Log -Message "Failed to set vm status to 'generalized'" -Severity Error
+    exit
+  }
+
+  Write-Log -Message "Loading vm information"
+  $vmInformation = Get-AzVM -ResourceGroupName $WorkingRgName -Name $ImageVm
+  $vmInformationGen = Get-AzVM -ResourceGroupName $WorkingRgName -Name $ImageVm -Status
+
+  Write-Log -Message "Starting image creation process for managed image '$($imageName)' to resource group '$($WorkingRgName)'" -Severity Information
+  try {
+    # Create image and configuration
+    $imageConfig = New-AzImageConfig -Location $vmInformation.Location -SourceVirtualMachineId $vmInformation.Id -HyperVGeneration $vmInformationGen.HyperVGeneration
+    New-AzImage -Image $imageConfig -ImageName $ImageName -ResourceGroupName $WorkingRgName
+    Write-Log -Message "Created managed image. Continue execution" -Severity Success
+  }
+  catch {
+    Write-Log -Message "Failed to create managed image '$($imageName)'" -Severity Error
+    exit
+  }
+
+  Start-Sleep -Seconds 10
+}
+
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 Write-Host "
