@@ -257,6 +257,57 @@ function New-AzManagedImage {
   Start-Sleep -Seconds 10
 }
 
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ManagedImageName,
+ 
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$WorkingRgName,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ImageDefinition,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ImageVersion,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ComputeGallery,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$ComputeGalleryRg
+  )
+
+  Write-Log -Message "Acquiring Azure managed image details for image '$($ManagedImageName)'"
+  $managedImage = Get-AzImage -ImageName $ManagedImageName -ResourceGroupName $WorkingRgName
+  Write-Log -Message "Checking target Azure Compute Gallery '$($ComputeGallery)'" -Severity Information
+  $targetGallery = Get-AzGallery -Name $ComputeGallery -ResourceGroupName $ComputeGalleryRg
+
+  try {
+    Write-Log -Message "Starting deployment for new image version '$($ImageVersion)' on target definition '$($ImageDefinition)'" -Severity Information
+    $imageVersion = New-AzGalleryImageVersion -ResourceGroupName $targetGallery.ResourceGroupName `
+      -GalleryName $targetGallery.Name `
+      -GalleryImageDefinitionName $ImageDefinition `
+      -Name $ImageVersion `
+      -Location $targetGallery.Location `
+      -SourceImageId $managedImage.Id
+    
+    Write-Log -Message "Finished deployment of new image version" -Severity Success
+  }
+  catch {
+    Write-Log -Message "Failed to create new image version on Azure Compute Gallery '$($ComputeGallery)'"
+    exit
+  }
+  
+  Start-Sleep -Seconds 5
+}
+
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 Write-Host "
