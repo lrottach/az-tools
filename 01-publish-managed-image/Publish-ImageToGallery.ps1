@@ -78,6 +78,32 @@ function Write-Log {
   }
 }
 
+function Compare-AzContext {
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$SubscriptionId,
+ 
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$TenantId
+  )
+
+  $contextDetails = Get-AzContext
+
+  if ($null -eq $contextDetails) {
+    return $false
+  }
+
+  if ($contextDetails.Subscription.TenantId -eq $TenantId -and $contextDetails.Subscription.Id -eq $SubscriptionId) {
+    return $true
+  }
+
+  return $false
+  
+}
+
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 Write-Host "
