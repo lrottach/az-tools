@@ -403,7 +403,7 @@ Add-ImageToAzGallery -ManagedImageName $imageName `
 
 Write-Log -Message "Starting cleanup tasks for temporary resources" -Severity Information
 try {
-  Remove-AzResourceGroup -Name $temporaryRgName -Force
+  $cleanupResult = Remove-AzResourceGroup -Name $temporaryRgName -Force
   Write-Log -Message "Finished removal of all temporary resources" -Severity Success
 }
 catch {
