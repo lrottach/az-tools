@@ -36,14 +36,20 @@ $ErrorActionPreference = "SilentlyContinue"
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
 # Deployment variables
-$tenantId = ""
-$subscriptionId = ""
-$deploymentLocation = ""
+$tenantId = "<TENANT-ID>"
+$subscriptionId = "<SUBSCRIPTION-ID>"
+$deploymentLocation = "<LOCATION>"
 
 # Target resources
-$targetComputeGallery = ""
-$temporaryRg = ""
-
+$datePostfix = Get-Date -Format "ddMMyyy"
+$targetComputeGallery = "<AZ-COMPUTE-GALLERY>"
+$targetComputeGalleryRg = "<AZ-COMPUTE-GALLERY-RG>"
+$temporaryRgName = "<TEMP-RG>"
+$targetVnetName = "<TARGET-VNET>"
+$targetVnetRgName = "<TARGET-VNET-NAME>"
+$targetSubnet = "<SUBNET>"
+$imagePrefix = "win10-21H2-x64-en-gen2"
+$imageName = $imagePrefix + $datePostfix
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
@@ -221,7 +227,7 @@ function New-AzManagedImage {
   if (!($sysprepStatus.Contains("deallocated"))) {
     Write-Log -Message "VM was not properly deallocated. Start deallocating it" -Severity Information
     try {
-      Stop-AzVM -Name $ImageVm -ResourceGroupName $WorkingRgName -Force
+      $vmStatus = Stop-AzVM -Name $ImageVm -ResourceGroupName $WorkingRgName -Force
       Write-Log -Message "Deallocated virtual machine" -Severity Success
     }
     catch {
