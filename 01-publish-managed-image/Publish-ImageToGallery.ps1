@@ -13,6 +13,7 @@
   Creation Date:  <23/06/2022>
   License:        <MIT>
   Site:           <https://github.com/lrottach/az-tools>
+  Comments:       <Special Thanks to @mtrostel>
 .EXAMPLE
   <Example goes here. Repeat this attribute for more than one example>
 #>
