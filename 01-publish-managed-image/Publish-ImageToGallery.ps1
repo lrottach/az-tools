@@ -122,14 +122,25 @@ function New-AzTemporaryVm {
     [string]$TargetRgName
   )
 
+  # Variables
+  $trustedLaunchEnabled = $false
+
   # Dependency Check
   Write-Log -Message "Checking required depencencies for temporary VM deployment" -Severity Information
 
   $vm = Get-AzVM -Name $SourceVm
 
+  # Check if the provided source VM exists
   if ($null -eq $vm) {
     Write-Log -Message "The requested source VM does not exist. Restart the script and provide a valid virtual machine" -Severity Error
     exit
+  }
+
+  # Check if the provided source VM has TrustedLaunch enabled
+  Write-Log -Message "Checking if the provided source VM does have TrustedLaunch enabled" -Severity Information
+  if ($vm.SecurityProfile.SecurityType -eq "TrustedLaunch") {
+    $trustedLaunchEnabled = $true
+    Write-Log -Message "Source VM $($vm.Name) is TrustedLaunch enabled" -Severity Information
   }
 
   Write-Log -Message "Building new resource names" -Severity Information
