@@ -274,7 +274,7 @@ function New-AzManagedImage {
   try {
     # Create image and configuration
     $imageConfig = New-AzImageConfig -Location $vmInformation.Location -SourceVirtualMachineId $vmInformation.Id -HyperVGeneration $vmInformationGen.HyperVGeneration
-    New-AzImage -Image $imageConfig -ImageName $ImageName -ResourceGroupName $WorkingRgName
+    $azImage = New-AzImage -Image $imageConfig -ImageName $ImageName -ResourceGroupName $WorkingRgName
     Write-Log -Message "Created managed image. Continue execution" -Severity Success
   }
   catch {
