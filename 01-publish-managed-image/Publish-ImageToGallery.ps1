@@ -193,6 +193,13 @@ function New-AzTemporaryVm {
     -Location $deploymentLocation `
     -SubnetId $subnet.Id `
     -ErrorAction Continue
+  
+  # Enable security features if the source VM had them enabled
+  if ($trustedLaunchEnabled) {
+    Write-Log -Message "Enabling TrustedLaunch for the new temporary VM" -Severity Information
+    $vmConfig = Set-AzVMSecurityProfile -VM $vmConfig -SecurityType TrustedLaunch
+    $vmConfig = Set-AzVMUefi -VM $vmConfig -EnableSecureBoot $true -EnableVtpm $true
+  }
 
   $vmConfig = Add-AzVMNetworkInterface -VM $vmConfig -Id $vmnic.Id
   $vmConfig = Set-AzVMBootDiagnostic -VM $vmConfig -Disable
