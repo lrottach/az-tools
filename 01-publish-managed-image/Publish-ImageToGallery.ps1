@@ -122,14 +122,25 @@ function New-AzTemporaryVm {
     [string]$TargetRgName
   )
 
+  # Variables
+  $trustedLaunchEnabled = $false
+
   # Dependency Check
   Write-Log -Message "Checking required depencencies for temporary VM deployment" -Severity Information
 
   $vm = Get-AzVM -Name $SourceVm
 
+  # Check if the provided source VM exists
   if ($null -eq $vm) {
     Write-Log -Message "The requested source VM does not exist. Restart the script and provide a valid virtual machine" -Severity Error
     exit
+  }
+
+  # Check if the provided source VM has TrustedLaunch enabled
+  Write-Log -Message "Checking if the provided source VM does have TrustedLaunch enabled" -Severity Information
+  if ($vm.SecurityProfile.SecurityType -eq "TrustedLaunch") {
+    $trustedLaunchEnabled = $true
+    Write-Log -Message "Source VM $($vm.Name) is TrustedLaunch enabled" -Severity Information
   }
 
   Write-Log -Message "Building new resource names" -Severity Information
@@ -182,6 +193,13 @@ function New-AzTemporaryVm {
     -Location $deploymentLocation `
     -SubnetId $subnet.Id `
     -ErrorAction Continue
+  
+  # Enable security features if the source VM had them enabled
+  if ($trustedLaunchEnabled) {
+    Write-Log -Message "Enabling TrustedLaunch for the new temporary VM" -Severity Information
+    $vmConfig = Set-AzVMSecurityProfile -VM $vmConfig -SecurityType TrustedLaunch
+    $vmConfig = Set-AzVMUefi -VM $vmConfig -EnableSecureBoot $true -EnableVtpm $true
+  }
 
   $vmConfig = Add-AzVMNetworkInterface -VM $vmConfig -Id $vmnic.Id
   $vmConfig = Set-AzVMBootDiagnostic -VM $vmConfig -Disable
@@ -256,7 +274,7 @@ function New-AzManagedImage {
   try {
     # Create image and configuration
     $imageConfig = New-AzImageConfig -Location $vmInformation.Location -SourceVirtualMachineId $vmInformation.Id -HyperVGeneration $vmInformationGen.HyperVGeneration
-    New-AzImage -Image $imageConfig -ImageName $ImageName -ResourceGroupName $WorkingRgName
+    $azImage = New-AzImage -Image $imageConfig -ImageName $ImageName -ResourceGroupName $WorkingRgName
     Write-Log -Message "Created managed image. Continue execution" -Severity Success
   }
   catch {
