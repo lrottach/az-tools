@@ -11,7 +11,7 @@ import (
 
 func main() {
 
-	subId := "e7933ac0-8efa-46fa-9d1e-929ae1dd5e24"
+	subId := ""
 	rgName := ""
 	hpName := ""
 
