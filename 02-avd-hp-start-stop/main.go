@@ -14,9 +14,9 @@ import (
 
 func main() {
 
-	subId := "1381f146-f0c2-456c-8a3c-a2dff1c25742"
-	rgName := "thun-avd1-csn-rg"
-	hpName := "thun-avd1-cwe-w1-p1-DeploymentTesting"
+	subId := "sub-id"
+	rgName := "rg-name"
+	hpName := "hp-name"
 
 	ctx := context.Background()
 
