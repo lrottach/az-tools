@@ -3,56 +3,54 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"os"
+	"regexp"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/desktopvirtualization/armdesktopvirtualization/v2"
+	"github.com/charmbracelet/log"
 )
 
 func main() {
 
-	subId := ""
-	rgName := ""
-	hpName := ""
+	subId := "1381f146-f0c2-456c-8a3c-a2dff1c25742"
+	rgName := "thun-avd1-csn-rg"
+	hpName := "thun-avd1-cwe-w1-p1-DeploymentTesting"
 
 	ctx := context.Background()
 
+	log.Info("creating new Azure default credential")
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Fatalf("failed to obtain credentials: %v", err)
-	}
-
-	hpClient, err := createAzHostPoolClient(subId, cred)
-	if err != nil {
-		log.Fatalf("failed to acquire new host pool client %v: ", err)
-	}
-
-	hpList, err := listAzHostPools(hpClient, ctx)
-	if err != nil {
-		log.Fatalf("error: %v", err)
+		log.Fatal("failed to obtain credentials", "error", err)
+		os.Exit(1)
 	}
 
 	shClient, err := createAzSessionHostsClient(subId, cred)
 	if err != nil {
-		log.Fatalf("failed to acquire new session host client %v: ", err)
+		log.Fatal("failed to acquire new session host client", "error", err)
+		os.Exit(1)
 	}
 
-	for _, pool := range hpList {
-		// Print the id of each host pool
-		if pool != nil && pool.ID != nil {
-			fmt.Println("HostPool Id: ", *pool.ID)
-		}
+	vmClient, err := createAzVirtualMachinesClient(subId, cred)
+	if err != nil {
+		log.Fatal("failed to create new VirtualMachinesClient", "error", err)
 	}
 
 	shList, err := listAzSessionHosts(shClient, ctx, rgName, hpName)
 	if err != nil {
-		log.Fatalf("failed query list of session hosts: %v", err)
+		log.Fatal("failed to query list of session hosts", "error", err)
+		os.Exit(1)
 	}
 
+	log.Info("found session hosts", "count", len(shList))
+
 	for _, host := range shList {
-		// Print the name of eacht host pools
-		if host != nil && host.ID != nil {
-			fmt.Println("Session Host Id: ", *host.ID)
+		log.Info("processing", "host", *host.Name)
+		err := startAzvirtualMachine(vmClient, ctx, *host.Properties.ResourceID)
+		if err != nil {
+			log.Error("failed to start", "virtual machine", *host.Name)
 		}
 	}
 }
@@ -62,7 +60,8 @@ func createAzHostPoolClient(subId string, cred *azidentity.DefaultAzureCredentia
 
 	client, err := armdesktopvirtualization.NewHostPoolsClient(subId, cred, nil)
 	if err != nil {
-		log.Fatalf("failed to create HostPoolsClient: %v", err)
+		log.Fatal("failed to create HostPoolsClient: %v", err)
+		os.Exit(1)
 	}
 
 	return client, nil
@@ -72,8 +71,24 @@ func createAzHostPoolClient(subId string, cred *azidentity.DefaultAzureCredentia
 func createAzSessionHostsClient(subId string, cred *azidentity.DefaultAzureCredential) (*armdesktopvirtualization.SessionHostsClient, error) {
 	client, err := armdesktopvirtualization.NewSessionHostsClient(subId, cred, nil)
 	if err != nil {
-		log.Fatalf("failed to create SessionHostsClient: %v", err)
+		log.Fatal("failed to create SessionHostsClient: %v", err)
 	}
+
+	return client, nil
+}
+
+// createAzVirtualMachinesClient takes Azure credentials and generates a new VirtualMachinesClient
+func createAzVirtualMachinesClient(subId string, cred *azidentity.DefaultAzureCredential) (*armcompute.VirtualMachinesClient, error) {
+
+	log.Info("creating new client factory")
+	factory, err := armcompute.NewClientFactory(subId, cred, nil)
+	if err != nil {
+		log.Fatal("failed to create new factory", "error", err)
+		os.Exit(1)
+	}
+
+	log.Info("creating new VirtualMachinesClient")
+	client := factory.NewVirtualMachinesClient()
 
 	return client, nil
 }
@@ -85,7 +100,7 @@ func listAzHostPools(client *armdesktopvirtualization.HostPoolsClient, ctx conte
 	for pager.More() {
 		nextResult, err := pager.NextPage(ctx)
 		if err != nil {
-			log.Fatalf("failed to advance page: %v", err)
+			log.Fatal("failed to advance page: %v", err)
 		}
 		return nextResult.Value, nil
 	}
@@ -101,15 +116,62 @@ func listAzSessionHosts(client *armdesktopvirtualization.SessionHostsClient, ctx
 	for pager.More() {
 		nextResult, err := pager.NextPage(ctx)
 		if err != nil {
-			log.Fatalf("failed to advance page: %v", err)
-		}
-
-		for _, v := range nextResult.Value {
-			log.Println("session host %s:", v.Name)
+			log.Fatal("failed to advance page: %v", err)
 		}
 
 		return nextResult.Value, nil
 	}
 
 	return nil, fmt.Errorf("failed to acquire list of session hosts")
+}
+
+// extractResourceGroup takes a resource id as an input and extracts the resource group name
+func extractResourceGroup(resourceId string) string {
+	re := regexp.MustCompile(`resourceGroups/([a-zA-Z0-9_-]+)/providers`)
+	match := re.FindStringSubmatch(resourceId)
+
+	if len(match) == 2 {
+		return match[1]
+	}
+
+	return ""
+}
+
+// extractVmName takes a resource id as an input and extracts the virtual machine name
+func extractVmName(resourceId string) string {
+	re := regexp.MustCompile(`/virtualMachines/([a-zA-Z0-9_-]+)$`)
+	match := re.FindStringSubmatch(resourceId)
+
+	if len(match) == 2 {
+		return match[1]
+	}
+
+	return ""
+}
+
+// startAzVirtualMachine takes a resource id of a virtual machine and starts it
+func startAzvirtualMachine(client *armcompute.VirtualMachinesClient, ctx context.Context, vmId string) error {
+
+	vmName := extractVmName(vmId)
+	rgName := extractResourceGroup(vmId)
+
+	_, err := client.BeginStart(ctx, rgName, vmName, nil)
+	if err != nil {
+		log.Fatal("failed to request virtual machine start", "error", err)
+	}
+
+	return nil
+}
+
+// deallocateAzVirtualMachine takes a resource id of a virtual machine and begins deallocating it
+func deallocateAzVirtualMachine(client *armcompute.VirtualMachinesClient, ctx context.Context, vmId string) error {
+	vmName := extractVmName(vmId)
+	rgName := extractResourceGroup(vmId)
+
+	_, err := client.BeginDeallocate(ctx, rgName, vmName, nil)
+	if err != nil {
+		log.Fatal("failed to request vm deallocate", "error", err)
+	}
+
+	return nil
 }
