@@ -20,6 +20,8 @@
 
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------
 
+# Dynamic parameters you can provide when executing the script
+
 [CmdletBinding()]
 param (
   [Parameter()]
@@ -35,6 +37,9 @@ param (
 $ErrorActionPreference = "SilentlyContinue"
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
+
+# Static variables you can configure before executing the script
+# Those parameters stay the same in most cases and are used to configure the script
 
 # Deployment variables
 $tenantId = "<TENANT-ID>"
