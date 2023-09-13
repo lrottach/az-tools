@@ -4,11 +4,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
+	"testing"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/to"
+	"github.com/golang/mock/gomock"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/desktopvirtualization/armdesktopvirtualization/v2"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/desktopvirtualization/armdesktopvirtualization/v2/mock_armdesktopvirtualization"
 	"github.com/charmbracelet/log"
 )
 
@@ -123,6 +129,44 @@ func listAzSessionHosts(client *armdesktopvirtualization.SessionHostsClient, ctx
 	}
 
 	return nil, fmt.Errorf("failed to acquire list of session hosts")
+}
+
+func TestListAzSessionHosts(t *testing.T) {
+	// Create a mock SessionHostsClient
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockSessionHostsClient := mock_armdesktopvirtualization.NewMockSessionHostsClient(mockCtrl)
+
+	// Set up expected parameters and return values
+	expectedRgName := "test-rg"
+	expectedHpName := "test-hp"
+	expectedSessionHosts := []*armdesktopvirtualization.SessionHost{
+		{
+			Name: to.StringPtr("session-host-1"),
+		},
+		{
+			Name: to.StringPtr("session-host-2"),
+		},
+	}
+
+	mockPager := mock_armdesktopvirtualization.NewMockSessionHostListResultPage(mockCtrl)
+	mockPager.EXPECT().NextPage(gomock.Any()).Return(armdesktopvirtualization.SessionHostListResult{
+		Value: expectedSessionHosts,
+	}, nil)
+	mockSessionHostsClient.EXPECT().NewListPager(expectedRgName, expectedHpName, gomock.Nil()).Return(mockPager)
+
+	// Call the function being tested
+	sessionHosts, err := listAzSessionHosts(mockSessionHostsClient, context.Background(), expectedRgName, expectedHpName)
+
+	// Check the results
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(sessionHosts, expectedSessionHosts) {
+		t.Errorf("unexpected session hosts: got %v, want %v", sessionHosts, expectedSessionHosts)
+	}
 }
 
 // extractResourceGroup takes a resource id as an input and extracts the resource group name
