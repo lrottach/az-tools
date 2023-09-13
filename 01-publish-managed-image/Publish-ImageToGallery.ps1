@@ -47,15 +47,12 @@ $subscriptionId = "<SUBSCRIPTION-ID>"
 $deploymentLocation = "<LOCATION>"
 
 # Target resources
-$datePostfix = Get-Date -Format "ddMMyyy"
 $targetComputeGallery = "<AZ-COMPUTE-GALLERY>"
 $targetComputeGalleryRg = "<AZ-COMPUTE-GALLERY-RG>"
 $temporaryRgName = "<TEMP-RG>"
 $targetVnetName = "<TARGET-VNET>"
 $targetVnetRgName = "<TARGET-VNET-NAME>"
 $targetSubnet = "<SUBNET>"
-$imagePrefix = "win10-21H2-x64-en-gen2"
-$imageName = $imagePrefix + $datePostfix
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
@@ -223,24 +220,16 @@ function New-AzTemporaryVm {
   return $vmName
 }
 
-function New-AzManagedImage {
+function Update-AzTempVm {
   [CmdletBinding()]
   param(
-    [Parameter()]
-    [ValidateNotNullOrEmpty()]
-    [string]$ImageName,
-
     [Parameter()]
     [ValidateNotNullOrEmpty()]
     [string]$ImageVm,
  
     [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string]$WorkingRgName,
-
-    [Parameter()]
-    [ValidateNotNullOrEmpty()]
-    [string]$ImageNamePrefix 
+    [string]$WorkingRgName
   )
 
   Write-Log -Message "Starting image creation process" -Severity Information
@@ -271,22 +260,6 @@ function New-AzManagedImage {
     exit
   }
 
-  Write-Log -Message "Loading vm information"
-  $vmInformation = Get-AzVM -ResourceGroupName $WorkingRgName -Name $ImageVm
-  $vmInformationGen = Get-AzVM -ResourceGroupName $WorkingRgName -Name $ImageVm -Status
-
-  Write-Log -Message "Starting image creation process for managed image '$($imageName)' to resource group '$($WorkingRgName)'" -Severity Information
-  try {
-    # Create image and configuration
-    $imageConfig = New-AzImageConfig -Location $vmInformation.Location -SourceVirtualMachineId $vmInformation.Id -HyperVGeneration $vmInformationGen.HyperVGeneration
-    $azImage = New-AzImage -Image $imageConfig -ImageName $ImageName -ResourceGroupName $WorkingRgName
-    Write-Log -Message "Created managed image. Continue execution" -Severity Success
-  }
-  catch {
-    Write-Log -Message "Failed to create managed image '$($imageName)'" -Severity Error
-    exit
-  }
-
   Start-Sleep -Seconds 10
 }
 
@@ -295,7 +268,7 @@ function Add-ImageToAzGallery {
   param(
     [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string]$ManagedImageName,
+    [string]$SourceVmId,
  
     [Parameter()]
     [ValidateNotNullOrEmpty()]
@@ -330,7 +303,7 @@ function Add-ImageToAzGallery {
       -GalleryImageDefinitionName $ImageDefinition `
       -Name $ImageVersion `
       -Location $targetGallery.Location `
-      -SourceImageId $managedImage.Id
+      -SourceImageId $SourceVmId
     
     Write-Log -Message "Finished deployment of new image version" -Severity Success
   }
@@ -419,11 +392,11 @@ do {
   Start-Sleep -Seconds 10
 } while (!($sysprepCompleted))
 
-# Image creation
-New-AzManagedImage -ImageName $imageName -ImageVm $tempVmName -WorkingRgName $temporaryRgName -ImageNamePrefix "win10-21H2-x64-en-gen2"
+# Prepare temporary VM for image creation
+Update-AzTempVm -ImageVm $tempVmName -WorkingRgName $temporaryRgName
 
 # Publish to compute gallery
-Add-ImageToAzGallery -ManagedImageName $imageName `
+Add-ImageToAzGallery $SourceVmId $tempVm.Id `
   -WorkingRgName $temporaryRgName `
   -ImageDefinition $ImageDefinition `
   -ImageVersion $ImageVersion `
